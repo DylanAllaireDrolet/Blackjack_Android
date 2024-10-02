@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "BlackJack"
 include(":app")
+ 
