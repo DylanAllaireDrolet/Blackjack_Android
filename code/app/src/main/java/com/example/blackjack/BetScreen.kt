@@ -3,7 +3,6 @@ package com.example.blackjack
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,8 +15,8 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun BetScreen(
-    currentBet: Int,
-    onBetPlaced: (Int) -> Unit
+    currentBet: Float,
+    onBetPlaced: (Float) -> Unit
 ) {
     var betAmount by remember { mutableStateOf(currentBet) }
 
@@ -40,7 +39,7 @@ fun BetScreen(
             TextField(
                 value = betAmount.toString(),
                 onValueChange = {
-                    betAmount = it.toIntOrNull() ?: 0
+                    betAmount = (it.toIntOrNull() ?: 0).toFloat()
                 },
                 label = { Text("Bet Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
