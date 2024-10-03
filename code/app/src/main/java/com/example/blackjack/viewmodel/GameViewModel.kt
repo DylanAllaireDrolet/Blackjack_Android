@@ -29,6 +29,19 @@ class GameViewModel : ViewModel() {
     val splitHandTwo: StateFlow<List<Card>> = _splitHandTwo
 
     private val gameRepository = GameRepository()
+    private val _deckId = MutableStateFlow<String?>(null)
+    val deckId: StateFlow<String?> = _deckId
+
+    fun createNewDeck(deckCount: Int) {
+        try {
+            viewModelScope.launch {
+                val deckResponse = gameRepository.createNewDeck(deckCount)
+                _deckId.value = deckResponse.deckId
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     // Méthode pour définir la mise
     fun setBet(bet: Float) {
@@ -38,34 +51,36 @@ class GameViewModel : ViewModel() {
     // Méthode pour démarrer la partie
     fun startGame() {
         viewModelScope.launch {
-            val playerHand = gameRepository.drawInitialCards()
-            val dealerHand = gameRepository.drawInitialDealerCards()
+            val playerHand = gameRepository.drawCards(deckId.value!!, 2)
+            val dealerHand = gameRepository.drawCards(deckId.value!!, 2)
 
-            _playerCards.value = playerHand
-            _dealerCards.value = dealerHand
+
+
+            _playerCards.value = playerHand.cards
+            _dealerCards.value = dealerHand.cards
         }
     }
 
     // Méthode pour tirer une carte pour le joueur
     fun drawCardForPlayer() {
         viewModelScope.launch {
-            val newCard = gameRepository.drawCard()
-            _playerCards.value = _playerCards.value + newCard
+            val newCard = gameRepository.drawCards(deckId.value!!, 1)
+            _playerCards.value += newCard.cards
         }
     }
 
     // Méthode pour tirer une carte pour le split
     fun drawCardForSplitHandOne() {
         viewModelScope.launch {
-            val newCard = gameRepository.drawCard()
-            _splitHandOne.value = _splitHandOne.value + newCard
+            val newCard = gameRepository.drawCards(deckId.value!!, 1)
+            _splitHandOne.value += newCard.cards
         }
     }
 
     fun drawCardForSplitHandTwo() {
         viewModelScope.launch {
-            val newCard = gameRepository.drawCard()
-            _splitHandTwo.value = _splitHandTwo.value + newCard
+            val newCard = gameRepository.drawCards(deckId.value!!, 1)
+            _splitHandTwo.value += newCard.cards
         }
     }
 

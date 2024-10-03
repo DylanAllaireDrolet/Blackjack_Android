@@ -44,7 +44,14 @@ class MainActivity : ComponentActivity() {
                 TopAppBar(
                     title = { Text("Blackjack") },
                     actions = {
-                        IconButton(onClick = { navController.navigate("statistics") }) {
+                        IconButton(onClick = {
+                            if (navController.currentDestination?.route == "statistics") {
+                                navController.navigate("game")
+                            }
+                            else if (navController.currentDestination?.route != "bet") {
+                                navController.navigate("statistics")
+                            }
+                        }) {
                             Icon(
                                 Icons.Default.Menu, contentDescription = "Statistics"
                             )
@@ -75,7 +82,7 @@ class MainActivity : ComponentActivity() {
                         onDrawCard = { viewModel.drawCardForPlayer() },
                         onStop = {
                             viewModel.stopGame()
-                            navController.navigate("statistics")
+                            navController.navigate("bet")
                         }
                     )
                 }

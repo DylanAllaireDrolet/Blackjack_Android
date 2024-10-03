@@ -1,26 +1,29 @@
 package com.example.blackjack.repository
 
-import com.example.blackjack.model.Card
+import com.example.blackjack.api.BlackjackAPI
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import com.example.blackjack.model.DeckResponse
+import com.example.blackjack.model.CardDrawResponse
 
 class GameRepository {
 
-    // Simuler l'appel à une API pour tirer les cartes initiales
-    fun drawInitialCards(): List<Card> {
-        return listOf(
-            Card("2H", "https://example.com/2H.png", "2", "HEARTS"),
-            Card("5C", "https://example.com/5C.png", "5", "CLUBS")
-        )
+    private val api: BlackjackAPI
+    init {
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://420C56.drynish.synology.me/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        api = retrofit.create(BlackjackAPI::class.java)
     }
 
-    fun drawInitialDealerCards(): List<Card> {
-        return listOf(
-            Card("KH", "https://example.com/KH.png", "KING", "HEARTS"),
-            Card("??", "https://example.com/back.png", "BACK", "UNKNOWN")
-        )
+    suspend fun createNewDeck(deckCount : Int) : DeckResponse {
+
+        return api.createNewDeck(deckCount)
     }
 
-    // Simuler l'appel pour tirer une carte supplémentaire
-    fun drawCard(): Card {
-        return Card("8D", "https://example.com/8D.png", "8", "DIAMONDS")
+    suspend fun drawCards(deckId : String, count : Int) : CardDrawResponse {
+        return api.drawCards(deckId, count)
     }
 }
