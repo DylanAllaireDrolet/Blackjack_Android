@@ -19,7 +19,6 @@ class GameRepository {
     }
 
     suspend fun createNewDeck(deckCount : Int) : DeckResponse {
-
         return api.createNewDeck(deckCount)
     }
 

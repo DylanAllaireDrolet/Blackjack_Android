@@ -4,96 +4,159 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blackjack.model.Card
 import com.example.blackjack.repository.GameRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+enum class GameStatus {
+    IN_PROGRESS, WON, LOST, DRAW
+}
 
 class GameViewModel : ViewModel() {
 
-    // État pour la mise
     private val _currentBet = MutableStateFlow(0f)
     val currentBet: StateFlow<Float> = _currentBet
 
-    // État pour les cartes du joueur et du croupier
     private val _playerCards = MutableStateFlow<List<Card>>(emptyList())
     val playerCards: StateFlow<List<Card>> = _playerCards
 
     private val _dealerCards = MutableStateFlow<List<Card>>(emptyList())
     val dealerCards: StateFlow<List<Card>> = _dealerCards
 
-    // État pour les mains après split
-    private val _splitHandOne = MutableStateFlow<List<Card>>(emptyList())
-    val splitHandOne: StateFlow<List<Card>> = _splitHandOne
-
-    private val _splitHandTwo = MutableStateFlow<List<Card>>(emptyList())
-    val splitHandTwo: StateFlow<List<Card>> = _splitHandTwo
-
     private val gameRepository = GameRepository()
     private val _deckId = MutableStateFlow<String?>(null)
     val deckId: StateFlow<String?> = _deckId
 
-    fun createNewDeck(deckCount: Int) {
+    private val remain = MutableStateFlow<Int>(0)
+
+    private val balance = MutableStateFlow(1000f)
+    val currentBalance: StateFlow<Float> = balance
+
+    private val _gameStatus = MutableStateFlow(GameStatus.IN_PROGRESS)
+    val gameStatus: StateFlow<GameStatus> = _gameStatus
+
+    private val _dealerCardRevealed = MutableStateFlow(false)
+    val dealerCardRevealed: StateFlow<Boolean> = _dealerCardRevealed
+
+    suspend fun createNewDeck(deckCount: Int) {
         try {
-            viewModelScope.launch {
-                val deckResponse = gameRepository.createNewDeck(deckCount)
-                _deckId.value = deckResponse.deckId
-            }
+            val deckResponse = gameRepository.createNewDeck(deckCount)
+            _deckId.value = deckResponse.deckId
+            remain.value = deckResponse.remaining
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    // Méthode pour définir la mise
     fun setBet(bet: Float) {
+        if (bet > balance.value) {
+            return
+        }
         _currentBet.value = bet
     }
 
-    // Méthode pour démarrer la partie
     fun startGame() {
+        _dealerCardRevealed.value = false
+        _playerCards.value = emptyList()
+        _dealerCards.value = emptyList()
+        _gameStatus.value = GameStatus.IN_PROGRESS
         viewModelScope.launch {
-            val playerHand = gameRepository.drawCards(deckId.value!!, 2)
-            val dealerHand = gameRepository.drawCards(deckId.value!!, 2)
+            try {
+                if (deckId.value == null || remain.value <= 0) {
+                    createNewDeck(7)
+                }
+                val playerHand = gameRepository.drawCards(deckId.value!!, 2)
+                if (playerHand.remaining <= 0)
+                    createNewDeck(7)
+                val dealerHand = gameRepository.drawCards(deckId.value!!, 2)
+                if (dealerHand.remaining <= 0)
+                    createNewDeck(7)
 
-
-
-            _playerCards.value = playerHand.cards
-            _dealerCards.value = dealerHand.cards
+                _playerCards.value = playerHand.cards
+                if (calculateTotal(playerCards.value) >= 21) {
+                    stopGame()
+                }
+                _dealerCards.value = dealerHand.cards
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    // Méthode pour tirer une carte pour le joueur
     fun drawCardForPlayer() {
         viewModelScope.launch {
             val newCard = gameRepository.drawCards(deckId.value!!, 1)
+            if (newCard.remaining <= 0)
+                createNewDeck(7)
+
             _playerCards.value += newCard.cards
+            if (calculateTotal(playerCards.value) >= 21) {
+                stopGame()
+            }
         }
     }
+    suspend fun drawCardForDealer() {
+        val newCard = gameRepository.drawCards(deckId.value!!, 1)
+        if (newCard.remaining <= 0)
+            createNewDeck(7)
 
-    // Méthode pour tirer une carte pour le split
-    fun drawCardForSplitHandOne() {
-        viewModelScope.launch {
-            val newCard = gameRepository.drawCards(deckId.value!!, 1)
-            _splitHandOne.value += newCard.cards
-        }
+        _dealerCards.value += newCard.cards
     }
 
-    fun drawCardForSplitHandTwo() {
-        viewModelScope.launch {
-            val newCard = gameRepository.drawCards(deckId.value!!, 1)
-            _splitHandTwo.value += newCard.cards
-        }
-    }
-
-    // Méthode pour arrêter la main
     fun stopGame() {
-        // Logique pour arrêter le jeu
+        _dealerCardRevealed.value = true
+        viewModelScope.launch {
+            if (calculateTotal(playerCards.value) > 21) {
+                balance.value -= currentBet.value
+                _gameStatus.value = GameStatus.LOST
+            } else {
+                while (calculateTotal(dealerCards.value) < 17) {
+                    withContext(Dispatchers.IO) {
+                        drawCardForDealer()
+                    }
+                }
+                if (calculateTotal(dealerCards.value) > 21) {
+                    balance.value += currentBet.value
+                    _gameStatus.value = GameStatus.WON
+                } else if (calculateTotal(playerCards.value) > calculateTotal(dealerCards.value)) {
+                    balance.value += currentBet.value
+                    _gameStatus.value = GameStatus.WON
+                } else if(calculateTotal(playerCards.value) == calculateTotal(dealerCards.value)) {
+                    _gameStatus.value = GameStatus.DRAW
+                }
+                else {
+                    balance.value -= currentBet.value
+                    _gameStatus.value = GameStatus.LOST
+                }
+            }
+        }
     }
 
-    fun stopSplitHandOne() {
-        // Logique pour arrêter la première main après split
+    fun calculateTotal(cards: List<Card>): Int {
+        var total = 0
+        var aceCount = 0
+
+        for (card in cards) {
+            when (card.rank) {
+                "1" -> { // ACE
+                    total += 11
+                    aceCount += 1
+                }
+                "11", "12", "13" -> {
+                    total += 10
+                }
+                else -> {
+                    total += card.rank.toInt()
+                }
+            }
+        }
+        while (total > 21 && aceCount > 0) {
+            total -= 10
+            aceCount -= 1
+        }
+        return total
     }
 
-    fun stopSplitHandTwo() {
-        // Logique pour arrêter la deuxième main après split
-    }
 }
