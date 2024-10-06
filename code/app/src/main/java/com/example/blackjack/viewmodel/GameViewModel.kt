@@ -1,9 +1,12 @@
 package com.example.blackjack.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blackjack.model.Card
+import com.example.blackjack.model.CardDrawResponse
 import com.example.blackjack.repository.GameRepository
+import com.example.blackjack.repository.StatisticsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +17,7 @@ enum class GameStatus {
     IN_PROGRESS, WON, LOST, DRAW
 }
 
-class GameViewModel : ViewModel() {
+class GameViewModel (context: Context) : ViewModel() {
 
     private val _currentBet = MutableStateFlow(0f)
     val currentBet: StateFlow<Float> = _currentBet
@@ -40,11 +43,14 @@ class GameViewModel : ViewModel() {
     private val _dealerCardRevealed = MutableStateFlow(false)
     val dealerCardRevealed: StateFlow<Boolean> = _dealerCardRevealed
 
+    private val statisticsRepository = StatisticsRepository(context)
+
     suspend fun createNewDeck(deckCount: Int) {
         try {
             val deckResponse = gameRepository.createNewDeck(deckCount)
             _deckId.value = deckResponse.deckId
             remain.value = deckResponse.remaining
+            statisticsRepository.resetStatistics()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -68,9 +74,11 @@ class GameViewModel : ViewModel() {
                     createNewDeck(7)
                 }
                 val playerHand = gameRepository.drawCards(deckId.value!!, 2)
+                updateStats(playerHand.cards)
                 if (playerHand.remaining <= 0)
                     createNewDeck(7)
                 val dealerHand = gameRepository.drawCards(deckId.value!!, 2)
+                updateStats(dealerHand.cards)
                 if (dealerHand.remaining <= 0)
                     createNewDeck(7)
 
@@ -88,6 +96,7 @@ class GameViewModel : ViewModel() {
     fun drawCardForPlayer() {
         viewModelScope.launch {
             val newCard = gameRepository.drawCards(deckId.value!!, 1)
+            updateStats(newCard.cards)
             if (newCard.remaining <= 0)
                 createNewDeck(7)
 
@@ -99,6 +108,7 @@ class GameViewModel : ViewModel() {
     }
     suspend fun drawCardForDealer() {
         val newCard = gameRepository.drawCards(deckId.value!!, 1)
+        updateStats(newCard.cards)
         if (newCard.remaining <= 0)
             createNewDeck(7)
 
@@ -157,6 +167,14 @@ class GameViewModel : ViewModel() {
             aceCount -= 1
         }
         return total
+    }
+
+    fun updateStats(cards: List<Card>) {
+        viewModelScope.launch {
+            cards.forEach { card ->
+                statisticsRepository.updateCardStatistics(card.rank, 1)
+            }
+        }
     }
 
 }

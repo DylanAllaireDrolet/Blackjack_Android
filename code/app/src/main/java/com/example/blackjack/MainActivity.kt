@@ -16,7 +16,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -38,8 +40,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun AppScreen() {
-        val gameViewModel: GameViewModel by viewModels()
-        val statViewModel: StatsViewModel by viewModels()
+        val context = LocalContext.current
+        val gameViewModel: GameViewModel = viewModel { GameViewModel(context) }
+        val statViewModel: StatsViewModel = viewModel { StatsViewModel(context) }
         val balance by gameViewModel.currentBalance.collectAsState()
 
         val navController = rememberNavController()
@@ -65,12 +68,11 @@ class MainActivity : ComponentActivity() {
                 )
             },
             bottomBar = {
-                // Display the player's balance in the bottom right
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    contentAlignment = Alignment.BottomEnd // Align content to the bottom end
+                    contentAlignment = Alignment.BottomEnd
                 ) {
                     Text(text = "Balance: $balance", style = MaterialTheme.typography.bodyLarge)
                 }

@@ -24,7 +24,6 @@ fun StatisticsScreen(
             Text("Card Probabilities", style = MaterialTheme.typography.headlineSmall)
         }
 
-        // Affichage des probabilités de chaque carte
         probabilities.forEach { (cardValue, probability) ->
             item {
                 Text(
