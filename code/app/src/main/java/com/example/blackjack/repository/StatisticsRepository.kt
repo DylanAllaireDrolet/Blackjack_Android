@@ -38,13 +38,17 @@ class StatisticsRepository(context: Context) {
         cardStatisticsDao.updateRemainingCards(rank, count)
     }
 
-    suspend fun getCardProbabilities(): Map<String, Float> {
+    suspend fun getCardProbabilities(): Map<CardStatistic, Float> {
         val cardStatistics = cardStatisticsDao.getAllCardStatistics()
         val totalRemainingCards = cardStatistics.sumOf { it.remaining }
 
         return cardStatistics.associate { stat ->
-            stat.cardValue to (stat.remaining.toFloat() / totalRemainingCards * 100)
+            stat to stat.remaining.toFloat() / totalRemainingCards * 100
         }
+    }
+
+    suspend fun getRemainingCards(): Int {
+        return cardStatisticsDao.getAllCardStatistics().sumOf { it.remaining }
     }
 
     suspend fun resetStatistics() {

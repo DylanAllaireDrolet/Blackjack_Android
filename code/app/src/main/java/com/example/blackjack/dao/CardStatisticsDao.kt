@@ -22,4 +22,5 @@ interface CardStatisticsDao {
 
     @Query("DELETE FROM card_statistics")
     suspend fun resetStatistics()
+
 }

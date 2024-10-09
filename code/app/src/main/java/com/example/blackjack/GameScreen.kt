@@ -1,19 +1,18 @@
 package com.example.blackjack
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.ImageLoader
 import com.example.blackjack.model.Card
@@ -21,98 +20,126 @@ import coil.compose.rememberAsyncImagePainter
 import coil.decode.SvgDecoder
 import com.example.blackjack.viewmodel.GameStatus
 import com.example.blackjack.viewmodel.GameViewModel
-import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun GameScreen(gameViewModel: GameViewModel, navController: NavController) {
-
     val playerCards by gameViewModel.playerCards.collectAsState()
     val dealerCards by gameViewModel.dealerCards.collectAsState()
     val gameStatus by gameViewModel.gameStatus.collectAsState()
+    val dealerRevealed by gameViewModel.dealerCardRevealed.collectAsState()
 
-    var showDialog by remember { mutableStateOf(false) }
-    var dialogMessage by remember { mutableStateOf("") }
+    var showMessage by remember { mutableStateOf(false) }
+    var messageText by remember { mutableStateOf("") }
+    var messageColor by remember { mutableStateOf(Color.Gray) } // Couleur par défaut
 
-    LaunchedEffect(Unit) {
-        if (playerCards.isEmpty() && dealerCards.isEmpty()) {
-            gameViewModel.startGame()
-        }
-    }
+    val balance by gameViewModel.currentBalance.collectAsState()
+    val currentBet by gameViewModel.currentBet.collectAsState()
+
+    // Gestion du chargement des images
+    var loadedImages by remember { mutableStateOf(0) }
+    val totalImages = playerCards.size + dealerCards.size
+    val allImagesLoaded = totalImages in 1..loadedImages
 
     LaunchedEffect(gameStatus) {
         when (gameStatus) {
             GameStatus.WON -> {
-                dialogMessage = "You won!"
-                showDialog = true
+                messageText = "You won!"
+                messageColor = Color.Green
+                showMessage = true
             }
             GameStatus.LOST -> {
-                dialogMessage = "You lost!"
-                showDialog = true
+                messageText = "You lost!"
+                messageColor = Color.Red
+                showMessage = true
             }
             GameStatus.DRAW -> {
-                dialogMessage = "It's a draw!"
-                showDialog = true
+                messageText = "It's a draw!"
+                messageColor = Color.Gray
+                showMessage = true
             }
             GameStatus.IN_PROGRESS -> {
-                showDialog = false
+                showMessage = false
             }
         }
     }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text(text = "Résultat de la partie") },
-            text = { Text(text = dialogMessage) },
-            confirmButton = {
-                Button(onClick = {
-                    showDialog = false
-                    navController.navigate("bet")
-                }) {
-                    Text("Fermer")
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            item {
+                Text("Dealer's Cards", style = MaterialTheme.typography.headlineSmall)
+                Text("Total: ${gameViewModel.calculateTotal(dealerCards, dealerRevealed)}")
+                CardGrid(cards = dealerCards, isDealer = true, isRevealed = dealerRevealed, onImageLoaded = { loadedImages++ })
+            }
+
+            item {
+                Text("Your Cards", style = MaterialTheme.typography.headlineSmall)
+                Text("Total: ${gameViewModel.calculateTotal(playerCards)}")
+                CardGrid(cards = playerCards, isDealer = false, onImageLoaded = { loadedImages++ })
+            }
+
+            item {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(
+                        onClick = { gameViewModel.drawCardButtonPressed() },
+                        enabled = gameStatus == GameStatus.IN_PROGRESS && allImagesLoaded
+                    ) {
+                        Text("Draw Card")
+                    }
+                    Button(
+                        onClick = { gameViewModel.stopGame() },
+                        enabled = gameStatus == GameStatus.IN_PROGRESS && allImagesLoaded
+                    ) {
+                        Text("Stop")
+                    }
                 }
             }
-        )
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Afficher les cartes du croupier
-        item {
-            Text("Dealer's Cards", style = MaterialTheme.typography.headlineSmall)
         }
 
-        item {
-            CardRow(cards = dealerCards, isDealer = true, gameViewModel.dealerCardRevealed.collectAsState().value)
-        }
-
-        // Afficher les cartes du joueur
-        item {
-            Text("Your Cards", style = MaterialTheme.typography.headlineSmall)
-        }
-
-        item {
-            CardRow(cards = playerCards, isDealer = false)
-        }
-
-        // Boutons pour les actions
-        item {
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.fillMaxWidth()
+        if (showMessage) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .background(messageColor.copy(alpha = 0.8f))
             ) {
-                Button(onClick = {
-                    gameViewModel.drawCardForPlayer()
-                }) {
-                    Text("Draw Card")
-                }
-                Button(onClick = { gameViewModel.stopGame() }) {
-                    Text("Stop")
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = messageText,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontSize = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            showMessage = false
+                            navController.navigate("bet")
+                        }) {
+                            Text("Close")
+                        }
+
+                        if (balance >= currentBet) {
+                            Button(onClick = {
+                                showMessage = false
+                                gameViewModel.startGame()
+                            }) {
+                                Text("Replay")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -120,28 +147,33 @@ fun GameScreen(gameViewModel: GameViewModel, navController: NavController) {
 }
 
 @Composable
-fun CardRow(cards: List<Card>, isDealer: Boolean, isRevealed : Boolean = false) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        val baseUrl = "https://420C56.drynish.synology.me" //
-        items(cards.size) { index ->
-            val cardImageUrl = if (isDealer && index == 0) {
-                if (isRevealed)
-                    "$baseUrl${cards[index].image}"
-                else
-                    "$baseUrl/static/back.svg"
-            } else {
-                "$baseUrl${cards[index].image}"
+fun CardGrid(cards: List<Card>, isDealer: Boolean, isRevealed: Boolean = false, onImageLoaded: () -> Unit) {
+    val baseUrl = "https://420C56.drynish.synology.me"
+    val rows = cards.chunked(3)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        rows.forEach { rowCards ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowCards.forEachIndexed { index, card ->
+                    val cardImageUrl = if (isDealer && index == 0 && !isRevealed) {
+                        "$baseUrl/static/back.svg"
+                    } else {
+                        "$baseUrl${card.image}"
+                    }
+                    ImageCard(imageUrl = cardImageUrl, onImageLoaded = onImageLoaded)
+                }
             }
-            ImageCard(imageUrl = cardImageUrl)
         }
     }
 }
 
 @Composable
-fun ImageCard(imageUrl: String) {
+fun ImageCard(imageUrl: String, onImageLoaded: () -> Unit) {
     val imageLoader = ImageLoader.Builder(LocalContext.current)
         .components {
             add(SvgDecoder.Factory())
@@ -151,7 +183,8 @@ fun ImageCard(imageUrl: String) {
     Image(
         painter = rememberAsyncImagePainter(
             model = imageUrl,
-            imageLoader = imageLoader
+            imageLoader = imageLoader,
+            onSuccess = { onImageLoaded() }
         ),
         contentDescription = null,
         contentScale = ContentScale.FillBounds,

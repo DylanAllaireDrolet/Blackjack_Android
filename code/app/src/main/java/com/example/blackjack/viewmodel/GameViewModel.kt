@@ -56,6 +56,7 @@ class GameViewModel (context: Context) : ViewModel() {
         }
     }
 
+
     fun setBet(bet: Float) {
         if (bet > balance.value) {
             return
@@ -73,59 +74,66 @@ class GameViewModel (context: Context) : ViewModel() {
                 if (deckId.value == null || remain.value <= 0) {
                     createNewDeck(7)
                 }
-                val playerHand = gameRepository.drawCards(deckId.value!!, 2)
-                updateStats(playerHand.cards)
-                if (playerHand.remaining <= 0)
-                    createNewDeck(7)
-                val dealerHand = gameRepository.drawCards(deckId.value!!, 2)
-                updateStats(dealerHand.cards)
-                if (dealerHand.remaining <= 0)
-                    createNewDeck(7)
 
-                _playerCards.value = playerHand.cards
-                if (calculateTotal(playerCards.value) >= 21) {
-                    stopGame()
-                }
-                _dealerCards.value = dealerHand.cards
+                drawCardForPlayer(2)
+                drawCardForDealer(2)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    fun drawCardForPlayer() {
-        viewModelScope.launch {
-            val newCard = gameRepository.drawCards(deckId.value!!, 1)
-            updateStats(newCard.cards)
-            if (newCard.remaining <= 0)
+    suspend fun drawCardForPlayer(nbr: Int) {
+        if (deckId.value == null || remain.value <= 0) {
+            withContext(Dispatchers.IO) {
                 createNewDeck(7)
-
-            _playerCards.value += newCard.cards
-            if (calculateTotal(playerCards.value) >= 21) {
-                stopGame()
             }
         }
-    }
-    suspend fun drawCardForDealer() {
-        val newCard = gameRepository.drawCards(deckId.value!!, 1)
-        updateStats(newCard.cards)
-        if (newCard.remaining <= 0)
-            createNewDeck(7)
 
+        val newCard = gameRepository.drawCards(deckId.value!!, nbr)
+        remain.value = newCard.remaining
+        updateStats(newCard.cards)
+        if (remain.value <= 0) {
+            withContext(Dispatchers.IO) {
+                createNewDeck(7)
+            }
+        }
+
+        _playerCards.value += newCard.cards
+        if (calculateTotal(playerCards.value) >= 21) {
+            stopGame()
+        }
+    }
+    suspend fun drawCardForDealer(nbr: Int) {
+        if (deckId.value == null || remain.value <= 0) {
+            withContext(Dispatchers.IO) {
+                createNewDeck(7)
+            }
+        }
+
+        val newCard = gameRepository.drawCards(deckId.value!!, nbr)
+        remain.value = newCard.remaining
+        updateStats(newCard.cards)
+        if (remain.value <= 0) {
+            withContext(Dispatchers.IO) {
+                createNewDeck(7)
+            }
+        }
         _dealerCards.value += newCard.cards
     }
 
     fun stopGame() {
         _dealerCardRevealed.value = true
         viewModelScope.launch {
-            if (calculateTotal(playerCards.value) > 21) {
+            if (calculateTotal(playerCards.value) == 21) {
+                balance.value += (currentBet.value * 2)
+                _gameStatus.value = GameStatus.WON
+            } else if (calculateTotal(playerCards.value) > 21) {
                 balance.value -= currentBet.value
                 _gameStatus.value = GameStatus.LOST
             } else {
                 while (calculateTotal(dealerCards.value) < 17) {
-                    withContext(Dispatchers.IO) {
-                        drawCardForDealer()
-                    }
+                    drawCardForDealer(1)
                 }
                 if (calculateTotal(dealerCards.value) > 21) {
                     balance.value += currentBet.value
@@ -133,10 +141,9 @@ class GameViewModel (context: Context) : ViewModel() {
                 } else if (calculateTotal(playerCards.value) > calculateTotal(dealerCards.value)) {
                     balance.value += currentBet.value
                     _gameStatus.value = GameStatus.WON
-                } else if(calculateTotal(playerCards.value) == calculateTotal(dealerCards.value)) {
+                } else if (calculateTotal(playerCards.value) == calculateTotal(dealerCards.value)) {
                     _gameStatus.value = GameStatus.DRAW
-                }
-                else {
+                } else {
                     balance.value -= currentBet.value
                     _gameStatus.value = GameStatus.LOST
                 }
@@ -144,13 +151,21 @@ class GameViewModel (context: Context) : ViewModel() {
         }
     }
 
-    fun calculateTotal(cards: List<Card>): Int {
+    fun drawCardButtonPressed() {
+        viewModelScope.launch {
+            drawCardForPlayer(1)
+        }
+    }
+
+    fun calculateTotal(cards: List<Card>, revealFirstCard: Boolean = true): Int {
         var total = 0
         var aceCount = 0
-
-        for (card in cards) {
+        for ((index, card) in cards.withIndex()) {
+            if (!revealFirstCard && index == 0) {
+                continue
+            }
             when (card.rank) {
-                "1" -> { // ACE
+                "1" -> {
                     total += 11
                     aceCount += 1
                 }
@@ -169,6 +184,7 @@ class GameViewModel (context: Context) : ViewModel() {
         return total
     }
 
+
     fun updateStats(cards: List<Card>) {
         viewModelScope.launch {
             cards.forEach { card ->
@@ -176,5 +192,4 @@ class GameViewModel (context: Context) : ViewModel() {
             }
         }
     }
-
 }

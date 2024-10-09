@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         val gameViewModel: GameViewModel = viewModel { GameViewModel(context) }
         val statViewModel: StatsViewModel = viewModel { StatsViewModel(context) }
         val balance by gameViewModel.currentBalance.collectAsState()
+        val currentBet by gameViewModel.currentBet.collectAsState()
 
         val navController = rememberNavController()
 
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("game")
                             }
                             else if (navController.currentDestination?.route != "bet") {
+                                statViewModel.calculateProbabilities()
                                 navController.navigate("statistics")
                             }
                         }) {
@@ -72,9 +74,17 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    contentAlignment = Alignment.BottomEnd
+                    contentAlignment = Alignment.BottomStart
                 ) {
                     Text(text = "Balance: $balance", style = MaterialTheme.typography.bodyLarge)
+                }
+                Box (
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Text(text = "Current Bet : $currentBet", style = MaterialTheme.typography.bodyLarge)
                 }
             }
 
@@ -91,7 +101,7 @@ class MainActivity : ComponentActivity() {
                             gameViewModel.setBet(bet)
                             gameViewModel.startGame()
                             navController.navigate("game")
-                        }
+                        }, balance = balance
                     )
                 }
 
@@ -101,7 +111,8 @@ class MainActivity : ComponentActivity() {
 
                 composable("statistics") {
                     StatisticsScreen(
-                        probabilities = statViewModel.cardProbabilities.collectAsState().value
+                        cards = statViewModel.cardProbabilities.collectAsState().value,
+                        remainingCards = statViewModel.remainingCards.collectAsState().value
                     )
                 }
 

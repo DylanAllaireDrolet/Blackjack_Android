@@ -3,6 +3,7 @@ package com.example.blackjack.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.blackjack.model.CardStatistic
 import com.example.blackjack.repository.StatisticsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,8 +12,12 @@ import kotlinx.coroutines.launch
 class StatsViewModel(context: Context) : ViewModel() {
 
     private val statisticsRepository = StatisticsRepository(context)
-    private val _cardProbabilities = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val cardProbabilities: StateFlow<Map<String, Float>> = _cardProbabilities
+    private val _cardProbabilities = MutableStateFlow<Map<CardStatistic, Float>>(emptyMap())
+    val cardProbabilities: StateFlow<Map<CardStatistic, Float>> = _cardProbabilities
+    private val _remainingCardsForValue = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val remainingCardsForValue: StateFlow<Map<String, Int>> = _remainingCardsForValue
+    private val _remainingCards: MutableStateFlow<Int> = MutableStateFlow(0)
+    val remainingCards: StateFlow<Int> = _remainingCards
 
     init {
         calculateProbabilities()
@@ -20,8 +25,8 @@ class StatsViewModel(context: Context) : ViewModel() {
 
     fun calculateProbabilities() {
         viewModelScope.launch {
-            val probabilities = statisticsRepository.getCardProbabilities()
-            _cardProbabilities.value = probabilities
+            _remainingCards.value = statisticsRepository.getRemainingCards()
+            _cardProbabilities.value = statisticsRepository.getCardProbabilities()
         }
     }
 }

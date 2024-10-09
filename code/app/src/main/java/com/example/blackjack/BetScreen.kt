@@ -18,9 +18,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun BetScreen(
     currentBet: Float,
-    onBetPlaced: (Float) -> Unit
+    onBetPlaced: (Float) -> Unit,
+    balance: Float
 ) {
     var betAmount by remember { mutableStateOf(currentBet) }
+    var betAmountText by remember { mutableStateOf(currentBet.toString()) }
 
     LazyColumn(
         modifier = Modifier
@@ -39,9 +41,10 @@ fun BetScreen(
 
         item {
             TextField(
-                value = betAmount.toString(),
-                onValueChange = {
-                    betAmount = (it.toIntOrNull() ?: 0).toFloat()
+                value = betAmountText,
+                onValueChange = { text ->
+                    betAmountText = text
+                    betAmount = text.toFloatOrNull() ?: 0f
                 },
                 label = { Text("Bet Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -54,12 +57,18 @@ fun BetScreen(
         }
 
         item {
-            Button(
-                onClick = { onBetPlaced(betAmount) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Start Game")
+            if (betAmount > balance) {
+                Text("Insufficient balance", style = MaterialTheme.typography.bodyMedium)
             }
+            else {
+                Button(
+                    onClick = { onBetPlaced(betAmount) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Start Game")
+                }
+            }
+
         }
     }
 }
