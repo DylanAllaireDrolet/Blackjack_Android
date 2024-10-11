@@ -14,8 +14,6 @@ class StatsViewModel(context: Context) : ViewModel() {
     private val statisticsRepository = StatisticsRepository(context)
     private val _cardProbabilities = MutableStateFlow<Map<CardStatistic, Float>>(emptyMap())
     val cardProbabilities: StateFlow<Map<CardStatistic, Float>> = _cardProbabilities
-    private val _remainingCardsForValue = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val remainingCardsForValue: StateFlow<Map<String, Int>> = _remainingCardsForValue
     private val _remainingCards: MutableStateFlow<Int> = MutableStateFlow(0)
     val remainingCards: StateFlow<Int> = _remainingCards
 

@@ -95,7 +95,7 @@ fun GameScreen(gameViewModel: GameViewModel, navController: NavController) {
                         Text("Draw Card")
                     }
                     Button(
-                        onClick = { gameViewModel.stopGame() },
+                        onClick = { gameViewModel.stopButtonPressed() },
                         enabled = gameStatus == GameStatus.IN_PROGRESS && allImagesLoaded
                     ) {
                         Text("Stop")

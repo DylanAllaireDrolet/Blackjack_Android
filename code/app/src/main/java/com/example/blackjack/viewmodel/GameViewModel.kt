@@ -4,7 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blackjack.model.Card
-import com.example.blackjack.model.CardDrawResponse
+import com.example.blackjack.model.DeckStats
+import com.example.blackjack.repository.FirebaseRepository
 import com.example.blackjack.repository.GameRepository
 import com.example.blackjack.repository.StatisticsRepository
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +18,11 @@ enum class GameStatus {
     IN_PROGRESS, WON, LOST, DRAW
 }
 
-class GameViewModel (context: Context) : ViewModel() {
+class GameViewModel(context: Context) : ViewModel() {
+
+    private val deckStats = MutableStateFlow(mutableMapOf<String, DeckStats>())
+    private var startTime: Long = 0L
+    private var currentDeckStartTime: Long = 0L
 
     private val _currentBet = MutableStateFlow(0f)
     val currentBet: StateFlow<Float> = _currentBet
@@ -44,24 +49,37 @@ class GameViewModel (context: Context) : ViewModel() {
     val dealerCardRevealed: StateFlow<Boolean> = _dealerCardRevealed
 
     private val statisticsRepository = StatisticsRepository(context)
+    private val firebaseRepository = FirebaseRepository()
 
     suspend fun createNewDeck(deckCount: Int) {
+        endCurrentDeckSession()
         try {
             val deckResponse = gameRepository.createNewDeck(deckCount)
             _deckId.value = deckResponse.deckId
             remain.value = deckResponse.remaining
+
+            val stats = DeckStats(
+                cardsDrawnByUser = 0,
+                stopCount = 0,
+                totalCards = 52 * deckCount,
+                remainingCards = deckResponse.remaining,
+                hoursPlayed = 0.0
+            )
+            deckStats.value[deckResponse.deckId] = stats
+
             statisticsRepository.resetStatistics()
+
+
+            currentDeckStartTime = System.currentTimeMillis()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-
     fun setBet(bet: Float) {
-        if (bet > balance.value) {
-            return
+        if (bet <= balance.value) {
+            _currentBet.value = bet
         }
-        _currentBet.value = bet
     }
 
     fun startGame() {
@@ -74,13 +92,39 @@ class GameViewModel (context: Context) : ViewModel() {
                 if (deckId.value == null || remain.value <= 0) {
                     createNewDeck(7)
                 }
-
                 drawCardForPlayer(2)
                 drawCardForDealer(2)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+    }
+
+    fun startSession() {
+        if (deckId.value == null) {
+            viewModelScope.launch {
+                createNewDeck(7)
+            }
+        } else {
+            startTime = System.currentTimeMillis()
+            currentDeckStartTime = startTime
+        }
+    }
+
+    fun endCurrentDeckSession() {
+        val endTime = System.currentTimeMillis()
+        val sessionDuration = (endTime - currentDeckStartTime) / (1000 * 60 * 60.0)
+
+        viewModelScope.launch {
+            deckId.value?.let { id ->
+                deckStats.value[id]?.let { stats ->
+                    stats.hoursPlayed += sessionDuration
+                    firebaseRepository.saveDeckStats(id, stats)
+                }
+            }
+        }
+
+        currentDeckStartTime = System.currentTimeMillis()
     }
 
     suspend fun drawCardForPlayer(nbr: Int) {
@@ -92,6 +136,13 @@ class GameViewModel (context: Context) : ViewModel() {
 
         val newCard = gameRepository.drawCards(deckId.value!!, nbr)
         remain.value = newCard.remaining
+
+        deckId.value?.let {
+            val currentStats = deckStats.value[it] ?: DeckStats(0, 0, 0, 0, 0.0)
+            currentStats.cardsDrawnByUser += nbr
+            currentStats.remainingCards = remain.value
+            deckStats.value[it] = currentStats
+        }
         updateStats(newCard.cards)
         if (remain.value <= 0) {
             withContext(Dispatchers.IO) {
@@ -104,22 +155,44 @@ class GameViewModel (context: Context) : ViewModel() {
             stopGame()
         }
     }
+
+    fun drawCardButtonPressed() {
+        viewModelScope.launch {
+            drawCardForPlayer(1)
+        }
+    }
+
     suspend fun drawCardForDealer(nbr: Int) {
         if (deckId.value == null || remain.value <= 0) {
             withContext(Dispatchers.IO) {
                 createNewDeck(7)
             }
         }
-
         val newCard = gameRepository.drawCards(deckId.value!!, nbr)
         remain.value = newCard.remaining
+
+        deckId.value?.let {
+            val currentStats = deckStats.value[it] ?: DeckStats(0, 0, 0, 0, 0.0)
+            currentStats.remainingCards = remain.value
+            deckStats.value[it] = currentStats
+        }
         updateStats(newCard.cards)
         if (remain.value <= 0) {
             withContext(Dispatchers.IO) {
                 createNewDeck(7)
             }
         }
+
         _dealerCards.value += newCard.cards
+    }
+
+    fun stopButtonPressed() {
+        deckId.value?.let {
+            val currentStats = deckStats.value[it] ?: DeckStats(0, 0, 0, 0, 0.0)
+            currentStats.stopCount += 1
+            deckStats.value[it] = currentStats
+        }
+        stopGame()
     }
 
     fun stopGame() {
@@ -151,12 +224,6 @@ class GameViewModel (context: Context) : ViewModel() {
         }
     }
 
-    fun drawCardButtonPressed() {
-        viewModelScope.launch {
-            drawCardForPlayer(1)
-        }
-    }
-
     fun calculateTotal(cards: List<Card>, revealFirstCard: Boolean = true): Int {
         var total = 0
         var aceCount = 0
@@ -183,7 +250,6 @@ class GameViewModel (context: Context) : ViewModel() {
         }
         return total
     }
-
 
     fun updateStats(cards: List<Card>) {
         viewModelScope.launch {

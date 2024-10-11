@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "449528804307",
+    "project_id": "blackjacktp1",
+    "storage_bucket": "blackjacktp1.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:449528804307:android:44e6703edea3aad2667526",
+        "android_client_info": {
+          "package_name": "com.example.blackjack"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXmUI3Ga3zizAMmw9zJWuLo4Kr8xztIaw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

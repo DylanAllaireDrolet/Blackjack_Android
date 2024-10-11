@@ -5,11 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -20,22 +16,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import coil.ComponentRegistry
-import coil.ImageLoader
-import coil.compose.rememberAsyncImagePainter
 import com.example.blackjack.ui.theme.BlackJackTheme
 import com.example.blackjack.viewmodel.GameViewModel
 import com.example.blackjack.viewmodel.StatsViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val gameViewModel: GameViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -44,6 +38,11 @@ class MainActivity : ComponentActivity() {
                 AppScreen()
             }
         }
+    }
+
+    override fun onStop() {
+        gameViewModel.endCurrentDeckSession()
+        super.onStop()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +55,7 @@ class MainActivity : ComponentActivity() {
         val currentBet by gameViewModel.currentBet.collectAsState()
 
         val navController = rememberNavController()
+        gameViewModel.startSession()
 
         Scaffold(
             topBar = {
@@ -124,6 +124,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
     }
 }
