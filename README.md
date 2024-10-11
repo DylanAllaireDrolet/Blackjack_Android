@@ -1,2 +1,3 @@
 # Blackjack_Android
-Blackjack game on android using kotlin
+
+Lien de la vidéo : https://youtu.be/vxjmNp2mAKo
